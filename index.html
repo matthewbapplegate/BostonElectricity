@@ -130,10 +130,13 @@
 				console.log(highDate.getTime());
 				xScale.domain(d3.extent(fdata, function(d) {return d.Date;}));
 				yScale.domain(d3.extent(fdata,function(d){return d.NEMA;}));
+				tempScale.domain(d3.extent(fdata,function(d){return d.NEMATemp;}));
 				var t0 = svg.transition().duration(1000);
 				t0.selectAll(".line").attr("d",valueLine(fdata));
+				t0.selectAll(".tempLine").attr("d",tempLine(fdata));
 				t0.selectAll(".y.axis").call(yAxis);
 				t0.selectAll(".x.axis").call(xAxis);
+				t0.selectAll(".temp.axis").call(tempAxis);
 			}
 			
 		});
