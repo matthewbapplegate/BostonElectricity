@@ -4,6 +4,11 @@
 		<meta charset="utf-8">
 		<title>Mapping electricity with D3</title>
 		<script type="text/javascript" src="d3/d3.min.js"></script>
+		<link rel="stylesheet" href="http://code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css">
+  		<script src="http://code.jquery.com/jquery-1.10.2.js"></script>
+  		<script src="http://code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
+  	  	
+
 		<style type="text/css">
 			h1 {
 		font-size: 30px;
@@ -19,6 +24,9 @@
 		.x.axis path {
   			display: none;
 		}
+		.temp.axis {
+			fill: firebrick;
+		}
 
 		.line {
   			fill: none;
@@ -29,62 +37,69 @@
 			fill: none;
 			stroke: firebrick;
 			stroke-width:1px;
-			stroke-dasharray:5,5;
+			stroke-dasharray:10,5;
 		
 		</style>
 	</head>
 	<body>
 	<h1>Interactive plot of electricity use over time in Boston</h1>
-	<form>
-  		<label><input type="radio" name="city" value="0" checked> January-June</label>
-  		<label><input type="radio" name="city" value="1"> July-December</label>
-	</form>
+	<!--Interface for date picker jquery widget -->
+	<label for="from">From</label>
+	<input type="text" id="from" name="from">
+	<label for="to">to</label>
+	<input type="text" id="to" name="to"> <br>
 	<script type="text/javascript">
 		//Width and height all in px
 		var w = 1000;
 		var h = 500;
-		var margin=50;
+		var margin=75;
 		
+		//Create the canvas on which the data will be drawn
 		svg=d3.select("body").append("svg")
 			.attr("width",w)
 			.attr("height",h);
 		
+		//Define scale for the three axes
 		var xScale = d3.time.scale().range([margin,(w-margin)]);
 		var yScale = d3.scale.linear().range([(h-margin),margin]);
 		var tempScale = d3.scale.linear().range([(h-margin),margin]);
-		
-		var xAxis = d3.svg.axis().scale(xScale).orient("bottom");
+		//Define the axis
+		var xAxis = d3.svg.axis().scale(xScale).orient("bottom").ticks(10);
 		var yAxis = d3.svg.axis().scale(yScale).orient("left");
 		var tempAxis = d3.svg.axis().scale(tempScale).orient("right");
-		
+		//Create a function to parse the date in the data
 		var parseDate = d3.time.format("%m/%d/%Y %H").parse;
-		
+		//Create a function to read the data and create the line
 		var valueLine = d3.svg.line()
 			.x(function(d){return xScale(d.Date);})
 			.y(function(d){return yScale(d.NEMA);});
-			
+		//Do the same thing, but for the temperature line (did I repeat myself?)	
 		var tempLine = d3.svg.line()
 			.x(function(d){return xScale(d.Date);})
 			.y(function(d){return tempScale(d.NEMATemp);});
-			
+		
+		//Read in the data and do stuff	
 		d3.csv("data/cleaned_demand.csv", function(error,data){
+			//First make sure the date is parsed properly and that everything is in numbers
 			data.forEach(function(d) {
 				d.Date = parseDate(d.Date+' '+d.Hour);
 				d.NEMA = +d.NEMA;
 				d.NEMATemp = +d.NEMATemp;
 			});
+			//Default date range
+			var lowDate = new Date(2015,6,1,1);
+			var highDate = new Date(2015,6,7,1);
 			
-			var lowDate = new Date(2015,4,1,1);
-			var highDate = new Date(2015,5,1,1);
-			
+			//Initial filtering of the data
 			var fdata = data.filter(function(d) {
   				return d.Date < highDate && d.Date > lowDate;
 			})
 			
+			//Set the initial domains for all the scales
 			xScale.domain(d3.extent(fdata, function(d) {return d.Date;}));
 			yScale.domain(d3.extent(fdata,function(d){return d.NEMA;}));
 			tempScale.domain(d3.extent(fdata,function(d){return d.NEMATemp;}));
-				      
+			//Create the Demand and electricity lines	      
 			svg.append("path")
 				.datum(fdata)
 				.attr("class","line")
@@ -94,7 +109,7 @@
 				.datum(fdata)
 				.attr("class","tempLine")
 				.attr("d",tempLine(fdata));
-				
+			//Create the axes	
 			svg.append("g")
 				.attr("class","x axis")
 				.attr("transform","translate(0,"+(h-margin)+")")
@@ -109,41 +124,89 @@
 				.attr("class","temp axis")
 				.attr("transform","translate("+(w-margin)+",0)")
 				.call(tempAxis);
-			
-			d3.selectAll("input").on("change", function(){change(this.value,data);});
-			
-			function change(buttonValue,data){
+			//Label the axis
+			svg.append("text")
+            			.attr("text-anchor", "middle")  // this makes it easy to centre the text as the transform is applied to the anchor
+            			.attr("transform", "translate("+margin/4 +","+(h/2)+")rotate(-90)")  // text is drawn off the screen top left, move down and out and rotate
+            			.text("Demand (MW)");
+
+        		svg.append("text")
+            			.attr("text-anchor", "middle")  // this makes it easy to centre the text as the transform is applied to the anchor
+            			.attr("transform", "translate("+ (w/2) +","+(h-(margin/3))+")")  // centre below axis
+            			.text("Date");
+            		svg.append("text")
+            			.attr("text-anchor","middle")
+            			.attr("transform", "translate("+(w-(margin/3))+","+(h/2)+")rotate(90)")
+            			.style("fill","firebrick")
+            			.text("Temperature (F)");
+		
+			//All this is JQuery Datepicker widget stuff
+			$(function() {
+    				$( "#from" ).datepicker({
+      				defaultDate: new Date(2015,6,1),
+      				setDate: new Date(2015,6,1),
+      				changeMonth: true,
+      				numberOfMonths: 2,
+      				minDate:new Date(2015,0,1),
+      				maxDate:new Date(2015,11,30),
+      				onClose: function( selectedDate ) {
+        				$( "#to" ).datepicker( "option", "minDate", selectedDate );
+      				},
+      				onSelect: function(dateText) {
+      					var toDate = $( "#to" ).datepicker( "getDate" );
+      					var fromDate = $("#from").datepicker("getDate");
+      					//toDate = parseDate(toDate+"1");
+      					//fromDate = parseDate(fromDate+"1");
+    					change(fromDate,toDate,data); //Calls this function when the date changes
+  				}
+    				});
+    				$( "#to" ).datepicker({
+      					defaultDate: new Date(2015,6,7),
+      					setDate: new Date(2015,6,7),
+      					changeMonth: true,
+      					numberOfMonths: 2,
+      					minDate:new Date(2015,0,1),
+      					maxDate:new Date(2015,11,30),
+      					onClose: function( selectedDate ) {
+       		 				$( "#from" ).datepicker( "option", "maxDate", selectedDate );
+      					},
+      					onSelect: function(dateText) {
+      						var fromDate = $( "#from" ).datepicker( "getDate" );
+      						var toDate = $("#to").datepicker("getDate");
+      						//toDate = parseDate(toDate+"1");
+      						//fromDate = parseDate(fromDate+"1");
+    						change(fromDate,toDate,data);
+      					}
+      
+    				});
+  			});
+			//Default value for the date ranges
+			$("#to").val($.datepicker.formatDate("mm/dd/yy", new Date(2015,6,7)));
+			$("#from").val($.datepicker.formatDate("mm/dd/yy", new Date(2015,6,1)));
+			//d3.selectAll("input").on("change", function(){change(this.value,data);});
+			//Function to do all the changing of stuff
+			function change(lowDate,highDate,data){
 				
 				//var buttonValue = this.value;
-				
-				if (buttonValue === "0"){
-					var lowDate = new Date(2015,0,1,1);
-					var highDate = new Date(2015,5,30,23);
-				}
-				else{
-					var lowDate = new Date(2015,6,1,1);
-					var highDate = new Date(2015,11,31,23);
-				}
+				//Filter the data
 				var fdata = data.filter(function(d) {
   					return d.Date < highDate && d.Date > lowDate;
 				});
-				console.log(highDate.getTime());
+				//Renew the domains for each axis
 				xScale.domain(d3.extent(fdata, function(d) {return d.Date;}));
 				yScale.domain(d3.extent(fdata,function(d){return d.NEMA;}));
 				tempScale.domain(d3.extent(fdata,function(d){return d.NEMATemp;}));
+				//Transition the data.  Always comes in from the left and new data appear instantly, which 
+				//I don't love, but I'm not 100% sure how to fix it. keys and joins?
 				var t0 = svg.transition().duration(1000);
+				t0.selectAll(".y.axis").call(yAxis);
+				svg.selectAll(".x.axis").call(xAxis);
+				t0.selectAll(".temp.axis").call(tempAxis);
 				t0.selectAll(".line").attr("d",valueLine(fdata));
 				t0.selectAll(".tempLine").attr("d",tempLine(fdata));
-				t0.selectAll(".y.axis").call(yAxis);
-				t0.selectAll(".x.axis").call(xAxis);
-				t0.selectAll(".temp.axis").call(tempAxis);
 			}
 			
 		});
-		
-		
-		
-		
 	</script>
 	</body>
 </html>
